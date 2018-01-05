@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"os"
 
-	"usbd/errs"
-	"usbd/usbdlib"
+	"github.com/tarndt/usbd/errs"
+	"github.com/tarndt/usbd/usbdlib"
 )
 
 type FileDisk struct {

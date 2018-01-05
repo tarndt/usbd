@@ -6,7 +6,7 @@ import (
 	"sync"
 	"syscall"
 
-	"usbd/errs"
+	"github.com/tarndt/usbd/errs"
 )
 
 //NbdStream manages the kernel-space resources that public a network block device
