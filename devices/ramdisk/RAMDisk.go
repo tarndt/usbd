@@ -2,7 +2,8 @@ package ramdisk
 
 import (
 	"io"
-	"usbd/usbdlib"
+
+	"github.com/tarndt/usbd/usbdlib"
 )
 
 type RAMDisk struct {

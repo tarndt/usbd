@@ -6,7 +6,7 @@ import (
 	"hash"
 	"sync"
 
-	"usbd/errs"
+	"github.com/tarndt/usbd/errs"
 
 	"github.com/alberts/gorocks"
 )

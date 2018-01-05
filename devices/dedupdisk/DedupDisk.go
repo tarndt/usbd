@@ -4,8 +4,8 @@ import (
 	"io"
 	"sync"
 
-	"usbd/errs"
-	"usbd/usbdlib"
+	"github.com/tarndt/usbd/errs"
+	"github.com/tarndt/usbd/usbdlib"
 )
 
 type DedupDisk struct {

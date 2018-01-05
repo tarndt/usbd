@@ -4,11 +4,11 @@ import (
 	"log"
 	"path/filepath"
 
-	"usbd/devices/dedupdisk"
-	"usbd/devices/dedupdisk/impls"
-	"usbd/devices/filedisk"
-	"usbd/devices/ramdisk"
-	"usbd/usbdlib"
+	"github.com/tarndt/usbd/devices/dedupdisk"
+	"github.com/tarndt/usbd/devices/dedupdisk/impls"
+	"github.com/tarndt/usbd/devices/filedisk"
+	"github.com/tarndt/usbd/devices/ramdisk"
+	"github.com/tarndt/usbd/usbdlib"
 )
 
 const bytes1GB = 1024 * 1024 * 1024

@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"usbd/errs"
+	"github.com/tarndt/usbd/errs"
 )
 
 type Response struct {

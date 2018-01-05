@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"unsafe"
 
-	"usbd/errs"
+	"github.com/tarndt/usbd/errs"
 
 	"launchpad.net/gommap"
 )

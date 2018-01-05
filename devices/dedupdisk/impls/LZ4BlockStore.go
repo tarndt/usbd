@@ -12,7 +12,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"usbd/errs"
+	"github.com/tarndt/usbd/errs"
 )
 
 /* Compress block format:

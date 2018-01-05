@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"usbd/errs"
+	"github.com/tarndt/usbd/errs"
 )
 
 const syncDelay = time.Second * 5
