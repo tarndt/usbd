@@ -1,4 +1,4 @@
-package dedupdisk
+package dedupdisk_test
 
 import (
 	"errors"

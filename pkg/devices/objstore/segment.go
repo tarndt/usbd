@@ -195,7 +195,7 @@ func (seg *segment) flush(optBuf *bytes.Buffer, optEarlyUnlock func()) (err erro
 	atomic.StoreUint64(&seg.atomicDirty, 0) //mark clean so if somone writes during upload we revert to dirty
 	seg.remoteItem, err = seg.storeParams.syncFile(seg.localFile, strconv.Itoa(seg.ID), optBuf, optEarlyUnlock)
 
-	return nil
+	return err
 }
 
 //DeleteFile persists the segment to remote storage and removes the local data
