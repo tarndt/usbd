@@ -54,7 +54,8 @@ func MustGetConfig() *Config {
 	//Objectstore
 	var objStoreConfigJSON, AESMode, AESKey, Compress string
 	recAESMode := encrypt.ModeFromName(encrypt.ModeAESRecName).AlgoName()
-	flagCapacityVar(&cfg.ObjStoreConfig.LocalDiskCacheBytes, "objstore-diskcache", 0, "Amount of disk for caching remote objects (0 implies fullbacking or ex. 100 MiB, 20 GiB)")
+	flagCapacityVar(&cfg.ObjStoreConfig.LocalDiskCacheBytes, "objstore-diskcache", 0, "Amount of disk for caching remote objects (0 implies local fullbacking/caching or ex. 100 MiB, 20 GiB)")
+	flag.BoolVar(&cfg.ObjStoreConfig.PersistCache, "objstore-persistcache", false, "Should the local cache be persistent or deleted on device shutdown")
 	flag.StringVar(&cfg.ObjStoreConfig.Kind, "objstore-kind", s3.Kind, "Type of remote objectstore: 's3', 'b2', 'local', 'azure', 'swift', 'google', 'oracle' or 'sftp'")
 	flagCapacityVar(&cfg.ObjStoreConfig.ObjectBytes, "objstore-objsize", defObjectSize, "Size of remote objects (ex. 32 MiB, 1 GiB)")
 	flag.StringVar(&objStoreConfigJSON, "objstore-cfg", mustGetDefObjStoreParams(), "JSON configuration (default assumes local minio [kind \"s3\"] with default settings)")

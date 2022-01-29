@@ -69,11 +69,11 @@ func (quota OptQuotaBytes) apply(dev *device) {
 	dev.quotaBytes = int64(quota)
 }
 
-//OptPreserveCache instructs an ObjectStore device to not clean up its local disk cache
+//OptPersistCache instructs an ObjectStore device to not clean up its local disk cache
 // files. Primarily for debugging, but also a performance optimization if no other
 // machines are allowed to mutate the remote objects.
-type OptPreserveCache bool
+type OptPersistCache bool
 
-func (keepCache OptPreserveCache) apply(dev *device) {
-	dev.keepCache = bool(keepCache)
+func (keepUseCache OptPersistCache) apply(dev *device) {
+	dev.persistCache = bool(keepUseCache)
 }

@@ -36,6 +36,9 @@ func osbdFromCfg(cfg *conf.Config) (usbdlib.Device, error) {
 	if oscfg.LocalDiskCacheBytes > 0 {
 		opts = append(opts, objstore.OptQuotaBytes(oscfg.LocalDiskCacheBytes))
 	}
+	if oscfg.PersistCache {
+		opts = append(opts, objstore.OptPersistCache(true))
+	}
 	if oscfg.AESMode != encrypt.ModeIdentity {
 		opts = append(opts, objstore.OptEncrypt{Mode: oscfg.AESMode, Key: oscfg.AESKey})
 	}

@@ -39,8 +39,10 @@ type segment struct {
 // * {total/segment}Bytes int64 -> bytes per segment and sum of segments
 // * thickProvision -> no not use Linux sparse files
 // * quotaSema -> counting semaphore for tracking number of segments cached locally
-func loadSegments(container stow.Container, cacheDir string, totalBytes, segmentBytes int64, thickProvision bool, quotaSema sema.CountingSema) ([]segment, error) {
-	params := &storeParams{container: container, segmentBytes: segmentBytes, cacheDir: cacheDir, thickProvision: thickProvision, quotaSema: quotaSema}
+func loadSegments(container stow.Container, cacheDir string, totalBytes, segmentBytes int64, thickProvision, persistCache bool, quotaSema sema.CountingSema) ([]segment, error) {
+	params := &storeParams{
+		container: container, segmentBytes: segmentBytes, cacheDir: cacheDir,
+		thickProvision: thickProvision, persistCache: persistCache, quotaSema: quotaSema}
 	prefix := osbdPrefix + devicePrefix + container.Name() + blockPrefix
 	count := int(totalBytes / segmentBytes)
 
@@ -209,17 +211,12 @@ func (seg *segment) DeleteFile() (err error) {
 
 	if seg.Dirty() {
 		if err = seg.flush(nil, nil); err != nil {
-			return fmt.Errorf("Flush during DeleteFile failed: %w", err)
+			return fmt.Errorf("Flush of %q during DeleteFile failed: %w", seg.localFile.Name(), err)
 		}
 	}
 
-	filename := seg.localFile.Name()
-	if err = seg.localFile.Close(); err != nil {
-		return fmt.Errorf("Could not close local cache file %q before deleting it: %w", filename, err)
-	}
-
-	if err = os.Remove(filename); err != nil {
-		return fmt.Errorf("Could not remove local file %q: %w", filename, err)
+	if err = seg.storeParams.removeFile(seg.localFile); err != nil {
+		return fmt.Errorf("Could not remove local file %q: %w", seg.localFile.Name(), err)
 	}
 	atomic.StoreUint64(&seg.atomicBacked, 0)
 	seg.localFile = nil

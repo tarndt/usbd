@@ -3,6 +3,7 @@ package objstore
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -27,10 +28,10 @@ var copyBufPool sync.Pool = sync.Pool{
 }
 
 type storeParams struct {
-	container      stow.Container
-	segmentBytes   int64
-	cacheDir       string
-	thickProvision bool
+	container                    stow.Container
+	segmentBytes                 int64
+	cacheDir                     string
+	thickProvision, persistCache bool
 
 	quotaSema sema.CountingSema
 }
@@ -74,16 +75,13 @@ func (sp *storeParams) downloadFile(item stow.Item) (file *os.File, err error) {
 	if err = sp.claimCapacity(); err != nil {
 		return nil, fmt.Errorf("Not enough capacity to download file: %w", err)
 	}
-
-	fpath := filepath.Join(sp.cacheDir, osbdPrefix+devicePrefix+sp.container.Name()+blockPrefix+item.Name())
-	file, err = os.Create(fpath)
-	if err != nil {
-		return nil, fmt.Errorf("Could not create download object local file %q: %w", fpath, err)
-	}
 	defer func() {
 		if err != nil {
-			file.Close()
-			os.Remove(fpath)
+			sp.releaseCapacity()
+			if file != nil {
+				file.Close()
+				os.Remove(file.Name())
+			}
 		}
 	}()
 
@@ -94,6 +92,19 @@ func (sp *storeParams) downloadFile(item stow.Item) (file *os.File, err error) {
 		return nil, nil //we don't have anything to download
 	} else if remoteSize != sp.segmentBytes {
 		return nil, fmt.Errorf("Store reported %s was wrong size: Expected %s and found: %s ", describeItem(item), humanize.IBytes(uint64(sp.segmentBytes)), humanize.IBytes(uint64(remoteSize)))
+	}
+
+	fpath := filepath.Join(sp.cacheDir, item.Name())
+
+	file, err = sp.cachedFile(item, fpath, remoteSize)
+	if err != nil {
+		return nil, fmt.Errorf("Local cache is unusable for %s: %w", describeItem(item), err)
+	} else if file != nil {
+		return file, nil
+	}
+
+	if file, err = os.Create(fpath); err != nil {
+		return nil, fmt.Errorf("Could not create download object local file %q: %w", fpath, err)
 	}
 
 	data, err := item.Open()
@@ -121,6 +132,94 @@ func (sp *storeParams) downloadFile(item stow.Item) (file *os.File, err error) {
 		return nil, fmt.Errorf("Store download %s was wrong size: Expected %d bytes (%s) and found: %d bytes (%s)", describeItem(item), remoteSize, humanize.IBytes(uint64(remoteSize)), downloadedBytes, humanize.IBytes(uint64(downloadedBytes)))
 	}
 	return file, nil
+}
+
+func (sp *storeParams) cachedFile(item stow.Item, fpath string, remoteSize int64) (*os.File, error) {
+	dataFileInfo, err := os.Stat(fpath)
+	dataExists := err == nil
+	eTagPath := eTagFileName(fpath)
+	_, err = os.Stat(eTagPath)
+	eTagExists := err == nil
+
+	rmDataFile := func() error {
+		if err := os.Remove(fpath); err != nil {
+			return fmt.Errorf("Could not remove local cache file %q that did not have eTag metadata in preparation for re-download: %w", fpath, err)
+		}
+		return nil
+	}
+
+	rmETagFile := func() error {
+		if err := os.Remove(eTagPath); err != nil {
+			return fmt.Errorf("Could not remove local cache eTag metadata file %q that did not have matching local data file in preparation for re-download: %w", eTagPath, err)
+		}
+		return nil
+	}
+
+	switch {
+	case dataExists && !eTagExists:
+		if err = rmDataFile(); err != nil {
+			return nil, err
+		}
+
+	case !dataExists && eTagExists:
+		if err = rmETagFile(); err != nil {
+			return nil, err
+		}
+
+	case !sp.persistCache && (dataExists || eTagExists):
+		return nil, fmt.Errorf("Local cache and/or eTag metadata files exist but cache persistence is not enabled; Enable persistence or remove local files")
+
+	case dataExists && eTagExists:
+		fileETagBytes, err := os.ReadFile(eTagPath)
+		if err != nil {
+			return nil, fmt.Errorf("Could not read eTag metadata file %q while checking in locally persisted cache file could be used: %w", eTagPath, err)
+		}
+		fileETag := string(fileETagBytes)
+
+		itemETag, err := item.ETag()
+		if err != nil {
+			return nil, fmt.Errorf("Could not get remote item %s eTag metadata: %w", describeItem(item), err)
+		}
+
+		//Is the local data file valid for re-use?
+		if fileETag != "" && fileETag == itemETag && dataFileInfo.Mode().IsRegular() && dataFileInfo.Size() == remoteSize {
+			file, err := os.OpenFile(fpath, os.O_RDWR, 0666)
+			if err != nil {
+				return nil, fmt.Errorf("Could not open locally cached data file %q for re-use: %w", fpath, err)
+			}
+			return file, nil
+		}
+
+		//It was not, get rid of the them
+		rmDataErr, rmETagErr := rmDataFile(), rmETagFile()
+		switch {
+		case rmDataErr != nil:
+			return nil, rmDataErr
+		case rmETagErr != nil:
+			return nil, rmETagErr
+		}
+	}
+	return nil, nil
+}
+
+func (sp *storeParams) removeFile(file *os.File) error {
+	fpath := file.Name()
+
+	err := file.Close()
+	if err != nil {
+		return fmt.Errorf("Could not close local cache file %q before deleting it: %w", fpath, err)
+	}
+
+	if err = os.Remove(fpath); err != nil {
+		return fmt.Errorf("Could not remove local cache file %q: %w", fpath, err)
+	}
+
+	if sp.persistCache {
+		if err = os.Remove(eTagFileName(fpath)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("Could not remove local file %q: %w", fpath, err)
+		}
+	}
+	return nil
 }
 
 func (sp *storeParams) syncFile(file *os.File, segID string, optBuf *bytes.Buffer, optEarlyUnlock func()) (stow.Item, error) {
@@ -156,7 +255,31 @@ func (sp *storeParams) syncFile(file *os.File, segID string, optBuf *bytes.Buffe
 		return nil, fmt.Errorf("Could not upload to remote item %q in %s: %w", itemName, describeContainer(sp.container), err)
 	}
 
+	if sp.persistCache {
+		if err = persistEtag(file.Name(), item); err != nil {
+			return item, err
+		}
+	}
 	return item, nil
+}
+
+func persistEtag(assocFilename string, item stow.Item) error {
+	eTag, err := item.ETag()
+	if err != nil {
+		return fmt.Errorf("Could not get eTag from remote object: %w", err)
+	} else if eTag == "" {
+		return nil
+	}
+
+	if err = os.WriteFile(eTagFileName(assocFilename), []byte(eTag), 0666); err != nil {
+		return fmt.Errorf("Could not write eTag metadata file for cache persistence: %w", err)
+	}
+	return nil
+}
+
+func eTagFileName(assocFilename string) string {
+	const eTagFileSuffix = ".etag"
+	return assocFilename + eTagFileSuffix
 }
 
 func (sp *storeParams) claimCapacity() error {

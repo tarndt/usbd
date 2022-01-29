@@ -42,7 +42,7 @@ func TestNBD(t *testing.T) {
 	}
 	const totalBytes = 256 * 1024 * 1024 //256 MB
 	dev := createDevice(
-		t, createContainer(t, store), totalBytes, totalBytes,
+		t, createContainer(t, store), "", totalBytes, totalBytes,
 		OptCompressRemoteObjects(compress.ModeS2),
 		OptEncrypt{Mode: encrypt.ModeAESRec, Key: key},
 	)

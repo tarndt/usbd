@@ -37,7 +37,7 @@ type device struct {
 	compressMode compress.Mode
 	quotaBytes   int64
 
-	noMetadata, thickProvision, keepCache bool
+	noMetadata, thickProvision, persistCache bool
 
 	encryptMode encrypt.Mode
 	encryptKey  []byte
@@ -70,7 +70,7 @@ func NewDevice(ctx context.Context, container stow.Container, cacheDir string, t
 		return nil, fmt.Errorf("Could not apply configuration options: %w", err)
 	}
 
-	dev.segments, err = loadSegments(dev.container, cacheDir, dev.totalBytes, dev.segmentBytes, dev.thickProvision, dev.quotaSegSema)
+	dev.segments, err = loadSegments(dev.container, cacheDir, dev.totalBytes, dev.segmentBytes, dev.thickProvision, dev.persistCache, dev.quotaSegSema)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("Could not create device using %s: %w", describeContainer(dev.container), err)
@@ -305,7 +305,7 @@ func (dev *device) Close() error {
 		return fmt.Errorf("Failed to write local cache back to remote store during shutdown (local cache will be preserved): %w", err)
 	}
 
-	if !dev.keepCache {
+	if !dev.persistCache {
 		for i := range dev.segments {
 			if rmErr := dev.segments[i].DeleteFile(); rmErr != nil && err == nil {
 				err = rmErr

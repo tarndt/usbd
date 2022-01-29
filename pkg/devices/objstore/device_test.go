@@ -1,21 +1,15 @@
 package objstore
 
 import (
-	"net/http/httptest"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/tarndt/usbd/pkg/devices/objstore/compress"
 	"github.com/tarndt/usbd/pkg/devices/objstore/encrypt"
 	"github.com/tarndt/usbd/pkg/devices/testutil"
-	"github.com/tarndt/usbd/pkg/usbdlib"
 
 	"github.com/graymeta/stow"
 	"github.com/graymeta/stow/local"
-	"github.com/graymeta/stow/s3"
-	"github.com/johannesboyne/gofakes3"
-	"github.com/johannesboyne/gofakes3/backend/s3mem"
 )
 
 const testDirPrefix = "osbd-test-"
@@ -52,22 +46,10 @@ func testLocalS3(t *testing.T) {
 	t.Run("local-s3", func(t *testing.T) {
 		t.Parallel()
 
-		srv := httptest.NewServer(gofakes3.New(s3mem.New()).Server())
+		srv := s3Server()
 		defer srv.Close()
 
-		cfg := stow.ConfigMap{
-			s3.ConfigEndpoint:    srv.URL,
-			s3.ConfigAccessKeyID: "fake",
-			s3.ConfigSecretKey:   "fake",
-		}
-		if err := ValidateConfig(KindS3, cfg); err != nil {
-			t.Fatalf("Could not validate store config: %s", err)
-		}
-
-		store, err := NewStore(KindS3, cfg)
-		if err != nil {
-			t.Fatalf("Could not create local object store: %s", err)
-		}
+		store := s3Store(t, srv)
 
 		t.Run("compress-none", func(t *testing.T) {
 			testDeviceSizes(t, store)
@@ -142,34 +124,11 @@ func testSuite(t *testing.T, store stow.Location, totalBytes, objectBytes uint, 
 	t.Parallel()
 
 	container := createContainer(t, store)
-	dev := createDevice(t, container, totalBytes, objectBytes, options...)
+	dev := createDevice(t, container, "", totalBytes, objectBytes, options...)
 
 	testutil.TestDevSize(t, dev, totalBytes)
 	testutil.TestReadEmpty(t, dev, objectBytes)
 	devHash := testutil.TestWriteReadPattern(t, dev)
-	testExistingRemote(t, container, totalBytes, objectBytes, devHash, options...)
+	testExistingRemote(t, container, "", totalBytes, objectBytes, devHash, options...)
 	testutil.TestClose(t, dev)
-}
-
-func createContainer(t *testing.T, store stow.Location) stow.Container {
-	container, err := store.CreateContainer(strconv.FormatInt(time.Now().UnixNano(), 36))
-	if err != nil {
-		t.Fatalf("Could not create container: %s", err)
-	}
-	return container
-}
-
-func createDevice(t *testing.T, container stow.Container, totalBytes, objectBytes uint, options ...Option) usbdlib.Device {
-	dev, err := NewDevice(testutil.CreateContext(t), container, t.TempDir(), totalBytes, objectBytes, options...)
-	if err != nil {
-		t.Fatalf("Could not create device: %s", err)
-	}
-	return dev
-}
-
-func testExistingRemote(t *testing.T, container stow.Container, totalBytes, objectBytes uint, expectedHash []byte, options ...Option) {
-	t.Run("existing-remote-data", func(t *testing.T) {
-		dev := createDevice(t, container, totalBytes, objectBytes, options...)
-		testutil.TestReadHash(t, dev, expectedHash)
-	})
 }

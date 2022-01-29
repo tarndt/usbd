@@ -61,6 +61,7 @@ type ObjStoreConfig struct {
 	Kind                string
 	Config              stow.ConfigMap
 	LocalDiskCacheBytes Capacity
+	PersistCache        bool
 	ObjectBytes         Capacity
 	AESMode             encrypt.Mode
 	AESKey              []byte
@@ -81,9 +82,14 @@ func (c *ObjStoreConfig) String() string {
 		flushDesc = fmt.Sprintf(", flushing to remote story every %s using %d workers", c.FlushInterval, c.ConcurFlush)
 	}
 
-	return fmt.Sprintf("using a %s remote object store (%s), with %s objects, using up to %s of local storage, %s compression, %s encryption%s",
+	persistMode := "non-persistent"
+	if c.PersistCache {
+		persistMode = "persistent"
+	}
+
+	return fmt.Sprintf("using a %s remote object store (%s), with %s objects, using up to %s of %s local storage, %s compression, %s encryption%s",
 		c.Kind, stowCfgStr(c.Config), humanize.IBytes(uint64(c.ObjectBytes)),
-		size, c.CompressMode, c.AESMode, flushDesc,
+		size, persistMode, c.CompressMode, c.AESMode, flushDesc,
 	)
 }
 
