@@ -188,7 +188,7 @@ USBD Server (./usbdsrvd) started.
 USBD Server (./usbdsrvd) using config: Exporting 20 GiB volume "tutorial-vol" as next available NBD device with local storage at "/tmp/usbdsrv_cache" using driver locally-cached objectstore using a s3 remote object store (secret_key=<REDACTED>, access_key_id="minioadmin", endpoint="http://127.0.0.1:9000"), with 64 MiB objects, using up to as much as total device size of persistent local storage, s2 compression, aes-ctr encryption, flushing to remote story every 10s using 16 workers
 USBD Server (./usbdsrvd) is processing requests for "/dev/nbd0"
 ```
-Take note the device the volume is being exported on, the following instructions assume "/dev/nbd0". You can shutdown this service using Ctrl+C or `kill` (but make sure you umount it first!).
+Take note the device the volume is being exported on, the following instructions assume "/dev/nbd0". Later you can shutdown this service using ``Ctrl+C`` or `kill` (but make sure you umount it first!).
 
 *Session 3: Using it!*
 You can now format the device and start using it:
