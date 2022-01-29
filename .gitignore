@@ -1,1 +1,5 @@
 cmd/usbdsrvd/usbdsrvd
+key.*
+*.key
+*.aes
+

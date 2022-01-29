@@ -132,7 +132,9 @@ Arguments starting with <driver name>-X are only applicable if dev-type=X is bei
   -objstore-objsize value
     	Size of remote objects (ex. 32 MiB, 1 GiB) (default 64 MiB)
   -objstore-diskcache value
-    	Amount of disk for caching remote objects (0 implies fullbacking or ex. 100 MiB, 20 GiB)
+    	Amount of disk for caching remote objects (0 implies local fullbacking/caching or ex. 100 MiB, 20 GiB)
+  -objstore-persistcache
+    	Should the local cache be persistent or deleted on device shutdown
 
   -objstore-aeskey string
     	If AES is enabled; AES key to use to encrypt remote objects (if absent a key is generated and saved to ./key.aes, otherwise use: key:<value>, file:<path>, env:<varname>
@@ -147,6 +149,73 @@ Arguments starting with <driver name>-X are only applicable if dev-type=X is bei
   -objstore-flushevery duration
     	Frequency in which dirty local objects are uploaded to the remote objectstore (0 disables autoflush) (default 10s)
 ```
+
+### Usage Tutorial: objstore
+
+Lets create a 10 GB volume using local minio (S3 compatible) server
+
+*Session 1: Setup minio server*
+```
+cd /tmp
+wget https://dl.min.io/server/minio/release/linux-amd64/minio
+chmod u+x ./minio
+mkdir ./minio_data
+./minio server ./minio_data
+```
+Note the data in `/tmp/minio_data` would normally live on a remote service.
+
+You should see minio is running:
+```
+WARNING: Detected default credentials 'minioadmin:minioadmin', we recommend that you change these values with 'MINIO_ROOT_USER' and 'MINIO_ROOT_PASSWORD' environment variables
+......
+WARNING: Console endpoint is listening on a dynamic port (44599), please use --console-address ":PORT" to choose a static port.
+```
+
+*Session 2: Start a usbd server*
+```
+cd /tmp
+mkdir ./usbdsrv_cache
+git clone https://github.com/tarndt/usbd.git
+cd usbd/cmd/usbdsrvd
+sudo ./usbdsrvd -dev-type=objstore -store-dir=/tmp/usbdsrv_cache -store-name=tutorial-vol -store-size=10GiB
+```
+
+You should see the block device is being served:
+```
+Generated AES-256 key and stored it in "/tmp/usbdsrv_cache/key.aes"
+USBD Server (./usbdsrvd) started.
+USBD Server (./usbdsrvd) using config: Exporting 20 GiB volume "tutorial-vol" as next available NBD device with local storage at "/tmp/usbdsrv_cache" using driver locally-cached objectstore using a s3 remote object store (secret_key=<REDACTED>, access_key_id="minioadmin", endpoint="http://127.0.0.1:9000"), with 64 MiB objects, using up to as much as total device size of persistent local storage, s2 compression, aes-ctr encryption, flushing to remote story every 10s using 16 workers
+USBD Server (./usbdsrvd) is processing requests for "/dev/nbd0"
+```
+Take note the device the volume is being exported on, the following instructions assume "/dev/nbd0"
+You can shutdown this service using Ctrl+C or `kill` (but make sure you umount it first!).
+
+*Session 3: Using it!*
+You can now format the device and start using it:
+```
+sudo mkfs.ext4 /dev/nbd0
+cd /tmp
+mkdir ./tutorial-vol
+sudo mount /dev/nbd0 /tmp/tutorial-vol
+sudo chmod a+r,a+w /tmp/tutorial-vol/
+```
+
+The device should show as mounted and files written to `/tmp/tutorial-vol` are now backed with the (in this case local) objectstore.
+```
+$ mount | grep nbd
+/dev/nbd0 on /tmp/tutorial-vol type ext4 (rw,relatime)
+$ cd /tmp/tutorial-vol/
+$ echo "test file" > test.txt
+$ cat test.txt
+test file
+```
+
+To cleanup ensure you are not in ``/tmp/tutorial-vol`` and umount
+```
+cd /tmp
+sudo umount /tmp/tutorial-vol
+```
+You can now return to session 2, ``Ctrl+C`` usbdsrvd, and then session 3 and ``Ctrl+C`` minio.
 
 ### Future
  
