@@ -65,27 +65,38 @@ func NewDevice(ctx context.Context, container stow.Container, cacheDir string, t
 		segmentBytes: int64(objectBytes),
 	}
 
+	err := dev.applyOpts(options...)
+	if err != nil {
+		return nil, fmt.Errorf("Could not apply configuration options: %w", err)
+	}
+
+	dev.segments, err = loadSegments(dev.container, cacheDir, dev.totalBytes, dev.segmentBytes, dev.thickProvision, dev.quotaSegSema)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("Could not create device using %s: %w", describeContainer(dev.container), err)
+	}
+
+	return dev, nil
+}
+
+func (dev *device) applyOpts(options ...Option) error {
 	for _, opt := range options {
 		opt.apply(dev)
 	}
 
-	if dev.autoflush > 0 {
-		go dev.flushWorker()
-	}
-
 	if dev.noMetadata {
 		if dev.compressMode != compress.ModeIdentity {
-			return nil, fmt.Errorf("Backing store does not support metadata, but %s store compression is enabled", dev.compressMode)
+			return fmt.Errorf("Backing store does not support metadata, but %s store compression is enabled", dev.compressMode)
 		} else if dev.encryptMode != encrypt.ModeIdentity {
-			return nil, fmt.Errorf("Backing store does not support metadata, but %s store encryption is enabled", dev.encryptMode)
+			return fmt.Errorf("Backing store does not support metadata, but %s store encryption is enabled", dev.encryptMode)
 		}
 	} else {
 		if dev.encryptMode != encrypt.ModeIdentity {
 			if len(dev.encryptKey) < 1 {
-				return nil, fmt.Errorf("%s store encryption is enabled but no key was provided", dev.encryptMode)
+				return fmt.Errorf("%s store encryption is enabled but no key was provided", dev.encryptMode)
 			}
 			if err := encrypt.ValidAESKey(dev.encryptKey); err != nil {
-				return nil, fmt.Errorf("Invalid AES key provided: %w", err)
+				return fmt.Errorf("Invalid AES key provided: %w", err)
 			}
 			dev.container = encrypt.NewEncryptedContainer(dev.container, dev.encryptMode, dev.encryptKey)
 		}
@@ -94,7 +105,7 @@ func NewDevice(ctx context.Context, container stow.Container, cacheDir string, t
 
 	if dev.quotaBytes > 0 {
 		if dev.quotaBytes < dev.segmentBytes {
-			return nil, fmt.Errorf("Provided quota (%d bytes) was smaller than a single segment/object (%d bytes)", dev.quotaBytes, dev.segmentBytes)
+			return fmt.Errorf("Provided quota (%d bytes) was smaller than a single segment/object (%d bytes)", dev.quotaBytes, dev.segmentBytes)
 		}
 		if dev.quotaBytes < dev.totalBytes {
 			dev.quotaSegSema = sema.NewChanSemaTimeout(uint(dev.quotaBytes/dev.segmentBytes), 0)
@@ -105,13 +116,11 @@ func NewDevice(ctx context.Context, container stow.Container, cacheDir string, t
 		dev.concurFlush = 1
 	}
 
-	var err error
-	dev.segments, err = loadSegments(dev.container, cacheDir, dev.totalBytes, dev.segmentBytes, dev.thickProvision, dev.quotaSegSema)
-	if err != nil {
-		return nil, fmt.Errorf("Could not create device using %s: %w", describeContainer(dev.container), err)
+	if dev.autoflush > 0 {
+		go dev.flushWorker()
 	}
 
-	return dev, nil
+	return nil
 }
 
 //Size of this device in bytes
