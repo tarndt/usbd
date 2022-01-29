@@ -2,7 +2,7 @@
 User-Space Block Device (USBD) Framework (written in Go)
  [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)[![Go Reference](https://pkg.go.dev/badge/github.com/tarndt/usbd.svg)](https://pkg.go.dev/github.com/tarndt/usbd) [![Go Report Card](https://goreportcard.com/badge/github.com/tarndt/usbd)](https://goreportcard.com/report/github.com/tarndt/usbd)
 
-Many people are familiar with user-space file systems; this prototype is an attempt to similar provide user-space block devices, specifically those written in Go. USDB takes advantage of the seldom used [NBD](https://en.wikipedia.org/wiki/Network_block_device) interface provided by the Linux kernel to allow a daemon running in user-space to export a block device.
+Many people are familiar with user-space file systems; this library is an attempt to similar provide user-space block devices, specifically those written in Go. USDB takes advantage of the seldom used [NBD](https://en.wikipedia.org/wiki/Network_block_device) interface provided by the Linux kernel to allow a daemon running in user-space to export a block device. This package can be used to write software block devices and export them via /dev/nbdX. After doing so such a device can be formatted with the filesystem of the users'choice (ex. ext4, btrfs, xfs, etc) and mounted in the usual ways (ex. mount, /etc/fstab, etc).
 
 In this case a daemon is created using the USDB framework that acts as the NBD server. Overhead between the daemon and the kernel is minimized by using the [AF_UNIX](http://man7.org/linux/man-pages/man7/unix.7.html) (also known as AF_LOCAL) socket type to communicate between local processes efficiently. The USBD framework allows a Go programmer to define block devices that conform the the following simple interface:
 
@@ -34,21 +34,22 @@ pkg
 │   ├── dedupdisk
 │   │   └── An example, but potentially useful, USDB implmentation that uses files to
 │   │       back a logical device, but with the added use of hashing and a Pebble database
-│   │       for block level deduplication.
+│   │       for block level deduplication. This is an older prototype and file/ramdisk are
+│   │       better examples for those looking to implement their own devices.
 │   ├── ramdisk
 │   │   └── An example USBD implemenation that is memory backed (ramdrive).
 │   └── objstore
-│       └── A USDB implmentation, which due to its complexity is not a great
-│           example for learning how to build a user-space block device but is
-│           very likely practically useful in its own right as it creates a logical
+│       └── A USDB implmentation, which is practically useful as it creates a logical
 │           device which is cached locally by actually backed by a remote objectstore
-│            of the users choice. (Ex. S3/minio, Swift, BackBlaze, Azure/Google Object Storage).
+│           of the users choice. (Ex. S3/minio, Swift, BackBlaze, Azure/Google Object Storage).
+│           However, due to its complexity is not a great example for learning how to build
+│           a user-space block device.
 ├── usbdlib
 │   └── The core USB interface definitions and engine
 └── util
     └── Utilities for implementors of user-space block devices to reuse    
 ```
-Note the dedupdisk example is a non-trival implemenation compared to the others and uses [Pebble DB](https://github.com/cockroachdb/pebble).
+Note the objstore and dedupdisk implemenations are non-trival implemenation compared to the others and use the [stow ObjectStorage abstraction library](https://github.com/graymeta/stow) and [Pebble DB](https://github.com/cockroachdb/pebble) respectively.
  
 ### Current state
 
@@ -58,22 +59,20 @@ In addition to basic unit tests:
 
 ```
 $ go test ./...
-ok  	github.com/tarndt/usbd/pkg/devices/dedupdisk/dedupdisk_test	6.296s
-ok  	github.com/tarndt/usbd/pkg/devices/filedisk/filedisk_test	7.969s
-ok  	github.com/tarndt/usbd/pkg/devices/objstore	65.046s
-ok  	github.com/tarndt/usbd/pkg/devices/ramdisk	(cached)
+ok  	github.com/tarndt/usbd/pkg/devices/dedupdisk/dedupdisk_test	6.166s
+ok  	github.com/tarndt/usbd/pkg/devices/filedisk/filedisk_test	8.011s
+ok  	github.com/tarndt/usbd/pkg/devices/objstore	65.617s
+ok  	github.com/tarndt/usbd/pkg/devices/ramdisk	2.351s
+ok  	github.com/tarndt/usbd/pkg/usbdlib	(cached)
+ok  	github.com/tarndt/usbd/pkg/usbdlib/usbdlib_test	0.197s
 ok  	github.com/tarndt/usbd/pkg/util	(cached)
 ```
 
-I have performed mostly manual testing at this point with the more extensive test being exporting an instance of the USBD deduplicating file-based block device. Then creating a VirtualBox VM using the exported NDB device and installing Windows XP, Windows 10 or Ubuntu on it. 
-
-#### Deduplication
-
-To very the dedup implemenation I then "quick" (no zeroing) re-formatted it, performed another fresh install and verified sw-duplication was taking place by checking the disk file-set did not grow meaningfully. I have seen read performance up to 3.2 GB/s and write performance (while writing duplicate data) as high as 2.1 GB/s with SSDs hosting the backing PebbleDB database and block-file. 
+Manual testing has been performed using standard block device tools and by exporting an instance of the USBD reference implemenations and creating a VirtualBox VM using the exported NDB device and installing Windows XP, Windows 10 and Ubuntu on it. 
 
 #### ObjectStore
 
-This same procedure has been used to verify correct operation of the objectstore implemenation. Key to this implemenation preforming well use of the included [S2 compression](https://github.com/klauspost/compress/tree/master/s2) and fast (enough) network access to the backing objectstore server. For security reasons its highly recommended to use the provided AES encryption functionality.
+This OS install procedure has been used to verify correct operation of the objectstore implemenation. Key to this implemenation preforming well use of the included [S2 compression](https://github.com/klauspost/compress/tree/master/s2) and fast (enough) network access to the backing objectstore server. For security reasons its highly recommended to use the provided AES encryption functionality.
 
 The ObjectStore implemenation uses ([a fork](https://github.com/tarndt/stow) due to fixes) of the [stow ObjectStorage abstraction library](https://github.com/graymeta/stow) to support many popular object stores. The command line argument `-objstore-cfg=<yourJSON>` allows for ObjectStore specific configuration parameters to be passed, so see what these parameters look like, take a look at the per ObjectStore configuration. For examplem see [S3 config](https://github.com/tarndt/stow/blob/master/s3/config.go#L24-L53) or [Azure config](https://github.com/tarndt/stow/blob/master/azure/config.go#L13-L16) options.
 
@@ -89,13 +88,17 @@ mkdir /minio_data
 
 The minio server instance will use the default minio credentials which are in turn the defaults used by usbdsrvd when objectstore config is not provided.
  
+#### Deduplication
+
+To verify the dedup implemenation, after initial installaion testing the disk was then "quick" (no zeroing) re-formatted, and another fresh install was performed and file analysis verified duplication was taking place by checking the disk files did not grow meaningfully. Read performance up to 3.2 GB/s and write performance (while writing duplicate data) as high as 2.1 GB/s with SSDs hosting the backing PebbleDB database and block-file as been achieved. 
+
 ### Building
 
 This implemenation is completely Linux centric (since it uses NBD) and requires the kernel headers to be installed and available.
 
 ### Running
 
-While this is mean to be a library used by other daemons, the included usbdsrvd (main.go) will host instances of the sample device implemenations.
+While this library is intended to be used by other daemons, the included usbdsrvd (main.go) will host instances of the sample device implemenations and may be useful in its own right.
 
 ```
 Usage: ./usbdsrvd [optional: options see below...] [optional: NBD device to use ex. /dev/nbd0, if absent the first free device is used.]
