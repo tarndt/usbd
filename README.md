@@ -4,7 +4,7 @@ User-Space Block Device (USBD) Framework (written in Go)
 
 Many people are familiar with user-space file systems; this library is an attempt to similar provide user-space block devices, specifically those written in Go. USDB takes advantage of the seldom used [NBD](https://en.wikipedia.org/wiki/Network_block_device) interface provided by the Linux kernel to allow a daemon running in user-space to export a block device. This package can be used to write software block devices and export them via /dev/nbdX. After doing so such a device can be formatted with the filesystem of the user's choice (ex. ext4, btrfs, xfs, etc) and mounted in the usual ways (ex. mount, /etc/fstab, etc).
 
-A daemon is created using the USDB framework that acts as an NBD server. Overhead between the daemon and the kernel is minimized by using the [AF_UNIX](http://man7.org/linux/man-pages/man7/unix.7.html) (also known as AF_LOCAL) socket type to communicate between local processes efficiently. The USBD framework allows a Go programmer to define their own block devices that conform the the following simple interface:
+A daemon is created using the USDB framework that acts as an NBD server. Overhead between the daemon and the kernel is minimized by using the [AF_UNIX](http://man7.org/linux/man-pages/man7/unix.7.html) (also known as AF_LOCAL) socket type to communicate between local processes efficiently. The USBD framework allows a Go programmer to define their own block devices that conform the the following [simple interface](https://github.com/tarndt/usbd/blob/master/pkg/usbdlib/dev.go):
 
 ```go
 type Device interface {
@@ -18,7 +18,7 @@ type Device interface {
 }
 ```
 
-A `usbdlib.NbdStream` can then be configured to communicate with the kernel NDB facility and is passed to `usbdlib.ReqProcessor` which acts as a proxy between the kernel which is handling NDB requests and the users `usbdlib.Device` implementation.
+A `usbdlib.NbdStream` can then be configured to communicate with the kernel NDB facility and is passed to `usbdlib.ReqProcessor` which acts as a proxy between the kernel which is handling NDB requests and the users `usbdlib.Device` implementation. A command-line server, [usbdsrvd](https://github.com/tarndt/usbd/tree/master/cmd/usbdsrvd), is included to allow easy testing of the USDB engine and reference devices. This server will make a [chosen device](https://github.com/tarndt/usbd/tree/master/pkg/devices) available as `/dev/nbdX` after which time it can be formatted and mounted or otherwise used as any other block device.
 
 ```
 cmd
@@ -45,15 +45,17 @@ pkg
 │           However, due to its complexity is not a great example for learning how to build
 │           a user-space block device.
 ├── usbdlib
-│   └── The core USB interface definitions and engine
+│   └── The core USBD interface definitions and engine to export/serve implemenations
 └── util
     └── Utilities for implementors of user-space block devices to reuse    
 ```
-Note the objstore and dedupdisk implemenations are non-trival implemenation compared to the others and use the [stow ObjectStorage abstraction library](https://github.com/graymeta/stow) and [Pebble DB](https://github.com/cockroachdb/pebble) respectively.
+Note the [objstore](https://github.com/tarndt/usbd/tree/master/pkg/devices/objstore) and [dedupdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/dedupdisk) implemenations are non-trival implemenation compared to the others and use the [stow ObjectStorage abstraction library](https://github.com/graymeta/stow) and [Pebble DB](https://github.com/cockroachdb/pebble) respectively.
  
 ### Current state
 
 #### General
+
+There are [ramdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/ramdisk) and [filedisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/filedisk) device implemenations that are excellent for understanding how to implement a simple [USBD device]((https://github.com/tarndt/usbd/blob/master/pkg/usbdlib/dev.go)). Starting [usbdsrvd](https://github.com/tarndt/usbd/tree/master/cmd/usbdsrvd) with defaults (no arguments) will result in a 1 GB [ramdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/ramdisk) backed device being exposed as the next available NBD device.
  
 In addition to basic unit tests:
 
@@ -72,9 +74,9 @@ Manual testing has been performed using standard block device tools and by expor
 
 #### ObjectStore
 
-This OS install procedure has been used to verify correct operation of the objectstore implemenation. Key to this implemenation preforming well use of the included [S2 compression](https://github.com/klauspost/compress/tree/master/s2) and fast (enough) network access to the backing objectstore server. For security reasons its highly recommended to use the provided AES encryption functionality.
+This OS install procedure has been used to verify correct operation of the [objectstore](https://github.com/tarndt/usbd/tree/master/pkg/devices/objstore) implemenation. Key to this implemenation preforming well use of the included [S2 compression](https://github.com/klauspost/compress/tree/master/s2) and fast (enough) network access to the backing objectstore server. For security reasons its highly recommended to use the provided AES encryption functionality.
 
-The ObjectStore implemenation uses ([a fork](https://github.com/tarndt/stow) due to fixes) of the [stow ObjectStorage abstraction library](https://github.com/graymeta/stow) to support many popular object stores. The command line argument `-objstore-cfg=<yourJSON>` allows for ObjectStore specific configuration parameters to be passed, so see what these parameters look like, take a look at the per ObjectStore configuration. For examplem see [S3 config](https://github.com/tarndt/stow/blob/master/s3/config.go#L24-L53) or [Azure config](https://github.com/tarndt/stow/blob/master/azure/config.go#L13-L16) options.
+The [ObjectStore implemenation](https://github.com/tarndt/usbd/tree/master/pkg/devices/objstore) uses ([a fork](https://github.com/tarndt/stow) due to fixes) of the [stow ObjectStorage abstraction library](https://github.com/graymeta/stow) to support many popular object stores. The command line argument `-objstore-cfg=<yourJSON>` allows for ObjectStore specific configuration parameters to be passed, so see what these parameters look like, take a look at the per ObjectStore configuration. For examplem see [S3 config](https://github.com/tarndt/stow/blob/master/s3/config.go#L24-L53) or [Azure config](https://github.com/tarndt/stow/blob/master/azure/config.go#L13-L16) options.
 
 An easy way to test this is to setup a local [minio](https://min.io/) (S3 compatible) objectstore server:
 
@@ -90,15 +92,15 @@ The minio server instance will use the default minio credentials which are in tu
  
 #### Deduplication
 
-To verify the dedup implemenation, after initial installaion testing the disk was then "quick" (no zeroing) re-formatted, and another fresh install was performed and file analysis verified duplication was taking place by checking the disk files did not grow meaningfully. Read performance up to 3.2 GB/s and write performance (while writing duplicate data) as high as 2.1 GB/s with SSDs hosting the backing PebbleDB database and block-file as been achieved. 
+To verify the [dedup implemenation](https://github.com/tarndt/usbd/tree/master/pkg/devices/dedupdisk), after initial installaion testing the disk was then "quick" (no zeroing) re-formatted, and another fresh install was performed and file analysis verified duplication was taking place by checking the disk files did not grow meaningfully. Read performance up to 3.2 GB/s and write performance (while writing duplicate data) as high as 2.1 GB/s with SSDs hosting the backing PebbleDB database and block-file as been achieved. 
 
 ### Building
 
-This implemenation is completely Linux centric (since it uses NBD) and requires the kernel headers to be installed and available.
+This project is completely Linux centric (since it uses NBD) and requires the kernel headers to be installed and available.
 
 ### Running
 
-While this library is intended to be used by other daemons, the included usbdsrvd (main.go) will host instances of the sample device implemenations and may be useful in its own right.
+While this library is intended to be used by other daemons, the included [usbdsrvd](https://github.com/tarndt/usbd/tree/master/cmd/usbdsrvd) ([main.go](https://github.com/tarndt/usbd/blob/master/cmd/usbdsrvd/main.go)) will host instances of the [sample device implemenations](https://github.com/tarndt/usbd/tree/master/pkg/devices) and may be useful in its own right. Starting [usbdsrvd](https://github.com/tarndt/usbd/tree/master/cmd/usbdsrvd) with defaults (no arguments) will result in a 1 GB [ramdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/ramdisk) backed device being exposed as the next available NBD device.
 
 ```
 Usage: ./usbdsrvd [optional: options see below...] [optional: NBD device to use ex. /dev/nbd0, if absent the first free device is used.]
