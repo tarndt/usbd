@@ -46,7 +46,7 @@ pkg
 │   │   └── An example USBD implementation that is memory backed (ramdrive).
 │   └── objstore
 │       └── A USBD implementation, which is practically useful as it creates a logical
-│           device which is cached locally by actually backed by a remote objectstore
+│           device which is cached locally but actually backed by a remote objectstore
 │           of the users choice. (Ex. S3/minio, Swift, BackBlaze, Azure/Google Object Storage).
 │           However, due to its complexity is not a great example for learning how to build
 │           a user-space block device.
@@ -55,15 +55,15 @@ pkg
 └── util
     └── Utilities for implementors of user-space block devices to reuse    
 ```
-Note the [objstore](https://github.com/tarndt/usbd/tree/master/pkg/devices/objstore) and [dedupdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/dedupdisk) implementations are non-trivial implementation compared to the others and use the [stow ObjectStorage abstraction library](https://github.com/graymeta/stow) and [Pebble](https://github.com/cockroachdb/pebble) DB respectively.
+*Note the [objstore](https://github.com/tarndt/usbd/tree/master/pkg/devices/objstore) and [dedupdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/dedupdisk) implementations are non-trivial implementation compared to the others and use the [stow ObjectStorage abstraction library](https://github.com/graymeta/stow) and [Pebble](https://github.com/cockroachdb/pebble) DB respectively.*
  
 ## Current state
 
-This project is currently beta quality. There are no known defects or risks to usage, but it has not yet been widely used. Experience reports are helpful and encouraged!
+As of writing, this package is actively maintained. Issue reports are welcome. Pull requests are welcome but will require consent to a contributor agreement. This project is currently beta quality. There are no known defects or risks to usage, but it has not yet been widely used. Experience reports are helpful and encouraged!
 
 ### Basic Reference Devices (ramdisk and filedisk)
 
-There are [ramdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/ramdisk) and [filedisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/filedisk) device implementations that are excellent for understanding how to implement a simple [USBD device]((https://github.com/tarndt/usbd/blob/master/pkg/usbdlib/dev.go)). Starting [usbdsrvd](https://github.com/tarndt/usbd/tree/master/cmd/usbdsrvd) with defaults (no arguments) will result in a 1 GB [ramdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/ramdisk) backed device being exposed as the next available NBD device, typically `/dev/nbd0`.
+There are [ramdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/ramdisk) and [filedisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/filedisk) device implementations that are excellent for understanding how to implement a simple [USBD device]((https://github.com/tarndt/usbd/blob/master/pkg/usbdlib/dev.go)). Starting [usbdsrvd](https://github.com/tarndt/usbd/tree/master/cmd/usbdsrvd) with defaults (no arguments) will result in a 1 GB [ramdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/ramdisk) backed device being exposed as the next available NBD device, typically `/dev/nbd0`. Unlike these straight forward examples, there are also some [advanced device implemenations](https://github.com/tarndt/usbd#advanced-devices) which may be of more practical value.
 
 ### Building
 
@@ -87,7 +87,7 @@ ok  	github.com/tarndt/usbd/pkg/usbdlib	(cached)
 ok  	github.com/tarndt/usbd/pkg/usbdlib/usbdlib_test	0.197s
 ok  	github.com/tarndt/usbd/pkg/util	(cached)
 ```
-Executing these tests is just a matter of running `go test`. As seen above you can run all unit tests in the project repository by running `go test ./...` in the root directory. Some [tests that interact with the Linux kernel](https://github.com/tarndt/usbd/blob/master/pkg/devices/testutil/suites.go#L41) require [super-user privileges](https://en.wikipedia.org/wiki/Superuser) (aka `root`). Should you run tests with verbosity (`go test -v`) you will see some tests are skipped during normal execution. Additionally, while running tests with the race detector (``-race``) has proven fruitful for discovering data races, please be warned that in this mode tests often take an order of magnitude longer to run and may require you to increase the test timeout (ex. ``-timeout=10m``). The provided test suits do support a short mode as well (`go test -short`). Sometimes its useful to compile a package's unit tests to its own executable, and this can be done in typical go fashion `go test -c` (or `go test -c -race` to also enable the data race detector).
+Executing these tests is just a matter of running `go test`. As seen above you can run all unit tests in the project repository by running `go test ./...` in the root directory. Some [tests that interact with the Linux kernel](https://github.com/tarndt/usbd/blob/master/pkg/devices/testutil/suites.go#L41) require [super-user privileges](https://en.wikipedia.org/wiki/Superuser) (aka `root`). Should you run tests with verbosity (`go test -v`), you will see some tests are skipped during normal execution. Additionally, while running tests with the race detector (`-race`) has proven fruitful for discovering data races, please be warned that in this mode tests often take an order of magnitude longer to run and may require you to increase the test timeout (ex. `-timeout=10m`). The provided test suits do support a short mode as well (`go test -short`). Sometimes its useful to compile a package's unit tests to its own executable, and this can be done in typical Go fashion `go test -c` (or `go test -c -race` to also enable the data race detector).
 
 #### Manual Testing
 
@@ -98,6 +98,8 @@ Manual testing has been performed using standard block device tools (ex. [hdparm
 In addition to the basic reference devices, as mentioned in the project structure above, there are two notable non-trivial device implemenations.
 
 #### ObjectStore (objstore)
+
+The ObjectStore ([objstore](https://github.com/tarndt/usbd/tree/master/pkg/devices/objstore)) driver creates a logical device which is cached locally on disk but actually backed by a remote [object storage](https://en.wikipedia.org/wiki/Object_storage) of the users choice (ex. [S3](https://en.wikipedia.org/wiki/Amazon_S3), [Swift](https://wiki.openstack.org/wiki/Swift), BackBlaze [B2](https://en.wikipedia.org/wiki/Backblaze#Backblaze_B2_Storage) and [Azure's](https://azure.microsoft.com/en-us/services/storage/blobs/)/[Google's](https://cloud.google.com/storage) Object Storage). Besides the original implementors and providers of each object storage technology/service there are other projects and organizations that provide compatible alternatives for them; for example, [minio](https://min.io/) allows easy self-hosted/[Kubernetes](https://en.wikipedia.org/wiki/Kubernetes)-hosted S3, [Ceph](https://docs.ceph.com/en/pacific/) emulates both S3 and Swift with is [rados gateway](https://docs.ceph.com/en/pacific/radosgw/) and many other cloud providers offer S3-compatible SaaS such as [DigitalOcean's Spaces](https://www.digitalocean.com/products/spaces/) and [wasabi](https://wasabi.com/rcs/). 
 
 The above OS install procedure has been used to manually verify correct operation of the [objectstore](https://github.com/tarndt/usbd/tree/master/pkg/devices/objstore) implementation. Key to this implementation preforming well is the use of the included [S2 compression](https://github.com/klauspost/compress/tree/master/s2) and fast (enough) network access to the [backing objectstore server](https://github.com/tarndt/usbd/blob/master/pkg/devices/objstore/stowutil.go#L22-L29). For security reasons its highly recommended to use [the provided AES encryption](https://github.com/tarndt/usbd/blob/master/pkg/devices/objstore/options.go#L53-L57) functionality.
 
@@ -116,6 +118,8 @@ mkdir /minio_data
 The minio server instance will use the default minio credentials which are in turn the defaults used by `usbdsrvd` when objectstore config is not provided.
  
 #### Deduplication (dedupdisk)
+
+The Deduplication ([dedupdisk](https://github.com/tarndt/usbd/tree/master/pkg/devices/dedupdisk)) device implementation uses files to back a logical device, but with the added use of [content-hashing](https://en.wikipedia.org/wiki/Hash_function) and a [Pebble](https://github.com/cockroachdb/pebble) database for [block-level deduplication](https://en.wikipedia.org/wiki/Data_deduplication). Work is [in progress](https://github.com/tarndt/usbd/blob/master/pkg/devices/dedupdisk/impls/lz4blkstore.go#L49) to allow the blocks that must be stored to also be compressed.
 
 To verify the [dedup implementation](https://github.com/tarndt/usbd/tree/master/pkg/devices/dedupdisk), after initial installation testing the disk was then "quick" (no zeroing) re-formatted, and another fresh install was performed and file analysis verified duplication was taking place by checking the disk files did not grow meaningfully. Read performance up to 3.2 GB/s and write performance (while writing duplicate data) as high as 2.1 GB/s with SSDs hosting the backing PebbleDB database and block-file as been achieved. 
 
@@ -208,7 +212,7 @@ You should see the block device is being exported:
 ```
 Generated AES-256 key and stored it in "/tmp/usbdsrv_cache/key.aes"
 USBD Server (./usbdsrvd) started.
-USBD Server (./usbdsrvd) using config: Exporting 20 GiB volume "tutorial-vol" as next available NBD device with local storage at "/tmp/usbdsrv_cache" using driver locally-cached objectstore using a s3 remote object store (secret_key=<REDACTED>, access_key_id="minioadmin", endpoint="http://127.0.0.1:9000"), with 64 MiB objects, using up to as much as total device size of persistent local storage, s2 compression, aes-ctr encryption, flushing to remote story every 10s using 16 workers
+USBD Server (./usbdsrvd) using config: Exporting 20 GiB volume "tutorial-vol" as next available NBD device with local storage at "/tmp/usbdsrv_cache" using driver locally-cached objectstore using a s3 remote object store (secret_key=<REDACTED>, access_key_id="minioadmin", endpoint="http://127.0.0.1:9000"), with 64 MiB objects, using up to as much as total device size of persistent local storage for cache, s2 compression, aes-ctr encryption, flushing to remote story every 10s using 16 workers
 USBD Server (./usbdsrvd) is processing requests for "/dev/nbd0"
 ```
 Take note the device the volume is being exported on, the following instructions assume "/dev/nbd0" as shown above. Later, you can shutdown this service using ``Ctrl+C`` or `kill` (but make sure you umount the device first!).
@@ -247,7 +251,7 @@ You can now return to session 2, ``Ctrl+C`` usbdsrvd, and then finally session 3
 4. objectstore shutdown
 
 ## Future
- 
-As of writing, this package is actively maintained. Issue reports are welcome. Pull requests are welcome but will require consent to a contributor agreement.
 
-Work is in progress for a [CSI storage driver](https://kubernetes-csi.github.io/docs/drivers.html) that uses the objectstore implementation provided in this repository. If you are interested in contributing please contact the author!
+Work is in progress for an patch to the Linux kernel NBD driver to allow dynamic creation of NBD devices in addition to the pre-allocation at module load provided for today. This will allow facilities such as [udev](https://en.wikipedia.org/wiki/Udev) and the `mknod` [system call](https://man7.org/linux/man-pages/man2/mknod.2.html[) or [command](https://man7.org/linux/man-pages/man1/mknod.1.html) to provision more NBD devices then intitally created.
+
+Work is in progress for a [CSI storage driver](https://kubernetes-csi.github.io/docs/drivers.html) that uses the objectstore implementation provided in this repository. This will allow [Kubernetes](https://en.wikipedia.org/wiki/Kubernetes) to use the provideded object-storage backed device to provide [persistant volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/). If you are interested in contributing please contact the author!

@@ -87,7 +87,7 @@ func (c *ObjStoreConfig) String() string {
 		persistMode = "persistent"
 	}
 
-	return fmt.Sprintf("using a %s remote object store (%s), with %s objects, using up to %s of %s local storage, %s compression, %s encryption%s",
+	return fmt.Sprintf("using a %s remote object store (%s), with %s objects, using up to %s of %s local storage for cache, %s compression, %s encryption%s",
 		c.Kind, stowCfgStr(c.Config), humanize.IBytes(uint64(c.ObjectBytes)),
 		size, persistMode, c.CompressMode, c.AESMode, flushDesc,
 	)
