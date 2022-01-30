@@ -78,7 +78,7 @@ func MustGetConfig() *Config {
 		fmt.Printf("Usage: %s [optional: options see below...] [optional: NBD device to use ex. /dev/nbd0, if absent the first free device is used.]\n"+
 			"Arguments starting with <driver name>-X are only applicable if dev-type=X is being set.\n"+
 			"\tExample:\n"+"\t\t1 GiB device backed with by memory: ./usbdsrvd\n"+
-			"\t\t8 GiB device backed by a file and exported specfically on /dev/nbd5: ./usbdsrvd -dev-type=file -store-dir=/tmp -store-name=testfilevol -store-size=8GiB /dev/nbd5\n"+
+			"\t\t8 GiB device backed by a file and exported specifically on /dev/nbd5: ./usbdsrvd -dev-type=file -store-dir=/tmp -store-name=testfilevol -store-size=8GiB /dev/nbd5\n"+
 			"\t\t12 GiB device backed by file deduplicated using PebbleDB: ./usbdsrvd -dev-type=file -store-dir=/tmp -store-name=testdedupvol -store-size=12GiB\n"+
 			"\t\t20 GiB device backed by a locally running S3/minio objectstore: ./usbdsrvd -dev-type=objstore -store-dir=/tmp -store-name=testobjvol -store-size=20GiB\n\n", os.Args[0])
 		flag.PrintDefaults()
