@@ -254,6 +254,8 @@ github.com/stretchr/testify v1.6.1 h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/tarndt/sema v0.0.0-20180102203549-5335fa8ba954 h1:btY3WMjYXqxzXHRiM1va5S2w7h00MFIlq9AAXYDWXy4=
 github.com/tarndt/sema v0.0.0-20180102203549-5335fa8ba954/go.mod h1:lC9DAnO8SNBPVmtNDGIjdCM+/xWbo0HlYg1SBy+/Zuw=
+github.com/tarndt/sema v0.0.0-20220219212302-c67df5cf21d0 h1:XSPitS1wnsARf07c/gWpgXZFqd09rWsbGjUTsJZw1xo=
+github.com/tarndt/sema v0.0.0-20220219212302-c67df5cf21d0/go.mod h1:/Wn/uiCSC8PoID6SIepk1Qi8+9efvf5iG0C1O8eKaxk=
 github.com/tarndt/stow v0.2.8-0.20220119010100-e5705480d170 h1:IsQOBh7cG+ylNtu1OEnmu5o41SG2/f9FjZg0DVnKbdo=
 github.com/tarndt/stow v0.2.8-0.20220119010100-e5705480d170/go.mod h1:JAs139Zr29qfsecy7b+h9DRsWXbFbsd7LCrbCDYI84k=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=

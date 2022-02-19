@@ -11,7 +11,7 @@ require (
 	github.com/johannesboyne/gofakes3 v0.0.0-20210819161434-5c8dfcfe5310
 	github.com/klauspost/compress v1.14.1
 	github.com/pmorjan/kmod v1.0.0
-	github.com/tarndt/sema v0.0.0-20180102203549-5335fa8ba954
+	github.com/tarndt/sema v0.0.0-20220219212302-c67df5cf21d0
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
 	launchpad.net/gommap v0.0.0-20121012075617-000000000015
 )
